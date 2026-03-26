@@ -16,6 +16,7 @@ from typing import List, Any
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
+import pandas as pd
 
 
 class DataValidationError(Exception):
@@ -61,4 +62,40 @@ class PathExistsRule(ValidationRule):
             return True
         except TypeError as e:
             self._error_message = f"Error checking path {data}: {e}"
+            return False
+
+
+class ParserOutputValidatorRule(ValidationRule):
+    def __init__(self, domains: List[str]):
+        super().__init__()
+        self.domains = domains
+
+    def check(self, data: Any) -> bool:
+        """
+           Parser output key information validator
+           Only verify whether the key fields are included and the data is not empty
+           """
+
+        # 1. Check if it's a DataFrame
+        if not isinstance(data, pd.DataFrame):
+            self._error_message = f"Parsing result must be a DataFrame, got {type(data).__name__} instead."
+            return False
+
+        # 2. Check if data is not empty
+        if data.empty:
+            self._error_message = ("Parsing result validation failed: The DataFrame is empty.")
+            return False
+
+        # 3. Check if all key columns exist
+        try:
+            actual_columns = data.columns.tolist()
+            missing_cols = [col for col in self.domains if col not in actual_columns]
+            if missing_cols:
+                self._error_message = (
+                    f"Parsing result validation failed: Missing key columns - {missing_cols}"
+                )
+                return False
+            return True
+        except ValueError as e:
+            self._error_message = f"Error checking parser output data {data}: {e}"
             return False
