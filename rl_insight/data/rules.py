@@ -72,9 +72,9 @@ class ParserOutputValidatorRule(ValidationRule):
 
     def check(self, data: Any) -> bool:
         """
-           Parser output key information validator
-           Only verify whether the key fields are included and the data is not empty
-           """
+        Parser output key information validator
+        Only verify whether the key fields are included and the data is not empty
+        """
 
         # 1. Check if it's a DataFrame
         if not isinstance(data, pd.DataFrame):
@@ -83,7 +83,9 @@ class ParserOutputValidatorRule(ValidationRule):
 
         # 2. Check if data is not empty
         if data.empty:
-            self._error_message = ("Parsing result validation failed: The DataFrame is empty.")
+            self._error_message = (
+                "Parsing result validation failed: The DataFrame is empty."
+            )
             return False
 
         # 3. Check if all key columns exist
@@ -91,9 +93,7 @@ class ParserOutputValidatorRule(ValidationRule):
             actual_columns = data.columns.tolist()
             missing_cols = [col for col in self.domains if col not in actual_columns]
             if missing_cols:
-                self._error_message = (
-                    f"Parsing result validation failed: Missing key columns - {missing_cols}"
-                )
+                self._error_message = f"Parsing result validation failed: Missing key columns - {missing_cols}"
                 return False
             return True
         except ValueError as e:
