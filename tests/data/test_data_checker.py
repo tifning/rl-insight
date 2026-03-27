@@ -34,4 +34,6 @@ def test_data_checker_multi_json_path_missing():
 
 def test_data_checker_summary_event_has_no_rule_with_dict_data():
     checker = DataChecker(data_type=DataEnum.SUMMARY_EVENT, data={"k": "v"})
-    checker.run()
+    with pytest.raises(DataValidationError) as exc_info:
+        checker.run()
+    assert "Data validation failed" in str(exc_info.value)
