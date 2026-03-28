@@ -45,7 +45,7 @@ class DataChecker:
         DataEnum.VERL_LOG: [],
         DataEnum.SUMMARY_EVENT: [
             ParserOutputValidatorRule(
-                domains=["role", "name", "rank_id", "start_time_ms", "start_time_ms"]
+                domains=["role", "name", "rank_id", "start_time_ms", "end_time_ms"]
             )
         ],
         DataEnum.UNKNOWN: [],
