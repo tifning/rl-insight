@@ -14,48 +14,90 @@
 
 """Base data definitions for RL-Insight."""
 
+from typing import Any, List
 
-from typing import List
-from .rules import ValidationRule, PathExistsRule, DataValidationError
 from enum import Enum
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
+
+from loguru import logger
+
+from .rules import (
+    DataValidationError,
+    ParserOutputValidatorRule,
+    MstxJsonFileExistsRule,
+    MstxJsonFieldValidRule,
+    NvtxJsonFileExistsRule,
+    NvtxJsonFieldValidRule,
+    PathExistsRule,
+    GmmDataRule,
+    ValidationRule,
+    TorchJsonFileExistsRule,
+    TorchJsonFieldValidRule,
 )
-logger = logging.getLogger(__name__)
+from .verl_log_rules import VerlLogExistRule, VerlLogKeyParamsRule
+from rl_insight.utils.schema import EVENTKEYS, GMMKEYS
 
 
 class DataEnum(Enum):
     """Enum for data types in RL-Insight."""
+
     # input data type of parser
-    MULTI_JSON = "multi_json"
+    MULTI_JSON_MSTX = "multi_json_mstx"
+    MULTI_JSON_TORCH = "multi_json_torch"
+    MULTI_JSON_NVTX = "multi_json_nvtx"
+    ASCEND_MEMORY = "ascend_memory"
     VERL_LOG = "verl_log"
+    GMM_DATA = "gmm_data"
     # output data type of parser, input data type of visualizer
     SUMMARY_EVENT = "summary_event"
+    GMM_SUMMARY = "gmm_summary"
+    SUMMARY_MEMORY_EVENT = "summary_memory_event"
     # other data type
     UNKNOWN = "unknown"
 
 
-class DataChecker():
+class DataChecker:
     """Base data class for RL-Insight."""
+
     rules: dict[DataEnum, List[ValidationRule]] = {
-        DataEnum.MULTI_JSON: [PathExistsRule()],
-        DataEnum.SUMMARY_EVENT: [],
+        DataEnum.MULTI_JSON_MSTX: [
+            PathExistsRule(),
+            MstxJsonFileExistsRule(),
+            MstxJsonFieldValidRule(),
+        ],
+        DataEnum.MULTI_JSON_TORCH: [
+            PathExistsRule(),
+            TorchJsonFileExistsRule(),
+            TorchJsonFieldValidRule(),
+        ],
+        DataEnum.MULTI_JSON_NVTX: [
+            PathExistsRule(),
+            NvtxJsonFileExistsRule(),
+            NvtxJsonFieldValidRule(),
+        ],
+        DataEnum.VERL_LOG: [VerlLogExistRule(), VerlLogKeyParamsRule()],
+        DataEnum.GMM_DATA: [PathExistsRule(), GmmDataRule()],
+        DataEnum.SUMMARY_EVENT: [
+            ParserOutputValidatorRule(domains=list(EVENTKEYS)),
+        ],
+        DataEnum.GMM_SUMMARY: [
+            ParserOutputValidatorRule(domains=list(GMMKEYS)),
+        ],
+        DataEnum.UNKNOWN: [],
     }
 
-    def __init__(self, type: DataEnum, data: str|dict):
-        self.type = type
+    def __init__(self, data_type: DataEnum, data: Any):
+        self.data_type = data_type
         self.data = data
 
     def run(self):
         """Validate the data"""
         errors = []
-        rules = self.rules[self.type]
+        if self.data_type not in self.rules:
+            raise ValueError(f"Invalid data type: {self.data_type}")
+        rules = self.rules[self.data_type]
         for rule in rules:
             if not rule.check(self.data):
                 errors.append(rule.error_message)
         if errors:
             raise DataValidationError("Data validation failed", errors)
-        logger.info(f"Data validation passed for {self.type}")
+        logger.info(f"Data validation passed for {self.data_type}")

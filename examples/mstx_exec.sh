@@ -2,18 +2,16 @@
 
 set -euo pipefail
 
-TORCH_PROFILER_DATA_PATH="${TORCH_PROFILER_DATA_PATH:-}"
+MSTX_PROFILER_DATA_PATH="${MSTX_PROFILER_DATA_PATH:-}"
 OUTPUT_PATH="${OUTPUT_PATH:-./output}"
-PROFILER_TYPE="${PROFILER_TYPE:-mstx}"
 VIS_TYPE="${VIS_TYPE:-html}"
 RANK_LIST="${RANK_LIST:-all}"
 
 echo "=========================================="
-echo "Torch Profiler Cluster Analysis"
+echo "MSTX Profiler Cluster Analysis"
 echo "=========================================="
-echo "Input Path:    ${TORCH_PROFILER_DATA_PATH}"
+echo "Input Path:    ${MSTX_PROFILER_DATA_PATH}"
 echo "Output Path:   ${OUTPUT_PATH}"
-echo "Profiler Type: ${PROFILER_TYPE}"
 echo "Vis Type:      ${VIS_TYPE}"
 echo "Rank List:     ${RANK_LIST}"
 echo "=========================================="
@@ -22,16 +20,16 @@ echo "=========================================="
 
 echo ">>> Start mstx data preprocessing..."
 
-python -m rl_insight.utils.mstx_preprocessing "${TORCH_PROFILER_DATA_PATH}"
+python -m rl_insight.utils.mstx_preprocessing "${MSTX_PROFILER_DATA_PATH}"
 
 echo ">>> Mstx data preprocessing completed."
 
 python -m rl_insight.main \
-    --input-path "${TORCH_PROFILER_DATA_PATH}" \
-    --profiler-type "${PROFILER_TYPE}" \
-    --output-path "${OUTPUT_PATH}" \
-    --vis-type "${VIS_TYPE}" \
-    --rank-list "${RANK_LIST}"
+    input.path="${MSTX_PROFILER_DATA_PATH}" \
+    timeline.parser.type=mstx \
+    input.rank_list="${RANK_LIST}" \
+    output.path="${OUTPUT_PATH}" \
+    timeline.visualizer.type="${VIS_TYPE}"
 
 echo "=========================================="
 echo ">>> Analysis completed successfully!"

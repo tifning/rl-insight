@@ -15,15 +15,40 @@
 """
 Cluster scheduling analysis and visualization for RL workloads.
 
-This package exposes:
-
-- ``main.main``: CLI entry point
-- ``mstx_parser.MstxClusterParser``: parser for Ascend MSTX traces
+This package exposes built-in parser classes and a CLI entry helper.
 """
 
-from .main import main  # noqa: F401
+from experimental import (
+    close,
+    init,
+    metric_count,
+    metric_distribution,
+    metric_value,
+    trace_op,
+    trace_state,
+    update_prometheus_config,
+)
+from .parser import MstxClusterParser, TorchClusterParser, NvtxClusterParser
 
-from .parser import mstx_parser
-from .parser import torch_parser
 
-__all__ = ["mstx_parser", "torch_parser"]
+def main():
+    # Lazy import avoids preloading rl_insight.main during package import.
+    from .main import main as _main
+
+    return _main()
+
+
+__all__ = [
+    "MstxClusterParser",
+    "TorchClusterParser",
+    "NvtxClusterParser",
+    "main",
+    "init",
+    "close",
+    "metric_count",
+    "metric_value",
+    "metric_distribution",
+    "trace_op",
+    "trace_state",
+    "update_prometheus_config",
+]

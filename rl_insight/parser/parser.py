@@ -12,30 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import multiprocessing
 from abc import ABC, abstractmethod
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Callable, List, Optional
+from typing import Any, Callable, Optional, Union
 
+import multiprocessing
+
+from loguru import logger
+from omegaconf import DictConfig
 import pandas as pd
 
-from rl_insight.data import DataEnum
-from rl_insight.utils.schema import Constant, DataMap, EventRow
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
-logger = logging.getLogger(__name__)
+from rl_insight.utils.schema import Constant, DataMap
 
 
 class BaseClusterParser(ABC):
-    def __init__(self, params) -> None:
-        self.input_type = DataEnum.MULTI_JSON
+    def __init__(self, params: Union[DictConfig, dict]) -> None:
         self.events_summary: Optional[pd.DataFrame] = None
-        rank_list = params.get(Constant.RANK_LIST, "all")
+        if isinstance(params, DictConfig):
+            rank_list = params.input.rank_list
+        else:
+            rank_list = params.get(Constant.RANK_LIST, "all")
         self._rank_list = (
             rank_list
             if rank_list == "all"
@@ -66,9 +62,9 @@ class BaseClusterParser(ABC):
 
         results = []
         completed = 0
+        failed_ranks = []
 
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
             future_to_rank = {
                 executor.submit(self._mapper_func, data_map): data_map[Constant.RANK_ID]
                 for data_map in data_maps
@@ -81,18 +77,25 @@ class BaseClusterParser(ABC):
                 try:
                     result = future.result()
                     results.append(result)
-                    logger.info(
-                        f"Completed rank {rank_id}: {completed}/{total_ranks} ({progress:.1f}%)"
-                    )
+                    if total_ranks < 10 or completed % max(2, total_ranks // 10) == 0:
+                        logger.info(
+                            f"Completed rank {rank_id}: {completed}/{total_ranks} ({progress:.1f}%)"
+                        )
                 except Exception as e:
+                    failed_ranks.append(rank_id)
                     logger.error(f"Failed to process rank {rank_id}: {e}")
 
         logger.info(
             f"Parallel processing completed: {completed}/{total_ranks} ranks processed"
         )
+        if failed_ranks and not results:
+            logger.error(
+                "All rank parsing tasks failed during parallel processing. "
+                f"Failed ranks: {failed_ranks}"
+            )
         return results
 
-    def _mapper_func(self, data_map: DataMap) -> list[EventRow]:
+    def _mapper_func(self, data_map: DataMap) -> list[dict[str, Any]]:
         """Collect RL performance data from a single rank"""
         profiler_data_path = data_map.get(Constant.PROFILER_DATA_PATH, "")
         rank_id = data_map.get(Constant.RANK_ID, -1)
@@ -105,8 +108,6 @@ class BaseClusterParser(ABC):
         return self.parse_analysis_data(profiler_data_path, rank_id, role)
 
     def reducer_func(self, mapper_res):
-        """Process data collected from all ranks"""
-        # Flatten valid results from all ranks
         reduce_results: list[dict] = []
         for result in mapper_res:
             if not result:
@@ -161,7 +162,7 @@ class BaseClusterParser(ABC):
     @abstractmethod
     def parse_analysis_data(
         self, profiler_data_path: str, rank_id: int, role: str
-    ) -> list[EventRow]:
+    ) -> list[dict[str, Any]]:
         """
         Parse profiling data for a specific rank and return event information.
 
@@ -176,7 +177,7 @@ class BaseClusterParser(ABC):
             role: The RL role name (e.g., 'rollout_generate', 'actor_compute_log_prob')
 
         Returns:
-            list[EventRow]: A list of event dictionaries, where each dict contains:
+            Row dictionaries (e.g. EventRow for MSTX/Torch). Each dict contains:
                 - name (str): Event name (e.g., 'generate_sequence', 'compute_log_prob')
                 - role (str): The RL role name (same as input parameter)
                 - domain (str): Event domain (e.g., 'default', 'communication_group')
